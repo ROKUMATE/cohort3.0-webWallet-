@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import nacl from 'tweetnacl';
 import { generateMnemonic, mnemonicToSeedSync, validateMnemonic } from 'bip39';
 import { derivePath } from 'ed25519-hd-key';
@@ -31,6 +32,7 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from './ui/alert-dialog';
+import axios, { Axios } from 'axios';
 
 interface Wallet {
     publicKey: string;
@@ -56,6 +58,7 @@ const WalletGenerator = () => {
         '60': 'Ethereum',
     };
     const [firstPage, setFirstPage] = useState<boolean>(true);
+    const [balance, setBalance] = useState<number>(0);
 
     const pathTypeName = pathTypeNames[pathTypes[0]] || '';
     // Whenever the page is re-rendered this useeffect hook is called again
@@ -71,6 +74,12 @@ const WalletGenerator = () => {
             setVisiblePhrases(JSON.parse(storedWallets).map(() => false));
         }
     }, []);
+
+    useEffect(() => {
+        if (firstPage) {
+            setWallets([]);
+        }
+    }, [firstPage]);
 
     const handleDeleteWallet = (index: number) => {
         setWallets(wallets.filter((_, i) => i !== index));
@@ -218,6 +227,49 @@ const WalletGenerator = () => {
             toast.success('Wallet generated successfully!');
         }
     };
+
+    const getBalanceDetails = async (publicKey: string) => {
+        if (pathTypes[0] === '501') {
+            // Solana
+            console.log('Fetching Solana balance');
+            const url =
+                'https://solana-devnet.g.alchemy.com/v2/jt65VVGJQMFWJyh2az9CIZv9EWYZ1zek';
+            const data = {
+                jsonrpc: '2.0',
+                id: 1,
+                method: 'getBalance',
+                params: [publicKey],
+            };
+
+            console.log('Public Key is : ', data.params[0]);
+
+            try {
+                const response = await axios.post(url, data, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
+                setBalance(response.data.result.value.toString());
+                console.log(response.data);
+            } catch (error) {
+                console.error('Error fetching Solana balance:', error);
+            }
+        } else if (pathTypes[0] === '60') {
+            // Ethereum
+            console.log('Fetching Ethereum balance');
+            try {
+                const response = await fetch(
+                    `https://api.etherscan.io/api?module=account&action=balance&address=${publicKey}&tag=latest&apikey=YourApiKeyToken`
+                );
+                const data = await response.json();
+                setBalance(data.result);
+                console.log(data);
+            } catch (error) {
+                console.error('Error fetching Ethereum balance:', error);
+            }
+        }
+    };
+
     return (
         <div className="flex flex-col gap-4">
             {firstPage && (
@@ -454,7 +506,9 @@ const WalletGenerator = () => {
                     </div>
                     <div
                         className={`grid gap-6 grid-cols-1 col-span-1  ${
-                            gridView ? 'md:grid-cols-2 lg:grid-cols-3' : ''
+                            gridView
+                                ? 'md:grid-cols-2 lg:grid-cols-4 md:grid-rows-1'
+                                : ''
                         }`}>
                         {wallets.map((wallet: any, index: number) => (
                             <motion.div
@@ -511,17 +565,39 @@ const WalletGenerator = () => {
                                     </AlertDialog>
                                 </div>
                                 <div className="flex flex-col gap-8 px-8 py-4 rounded-2xl bg-secondary/50">
-                                    <div
-                                        className="flex flex-col w-full gap-2"
-                                        onClick={() =>
-                                            copyToClipboard(wallet.publicKey)
-                                        }>
-                                        <span className="text-lg md:text-xl font-bold tracking-tighter">
-                                            Public Key
-                                        </span>
-                                        <p className="text-primary/80 font-medium cursor-pointer hover:text-primary transition-all duration-300 truncate">
-                                            {wallet.publicKey}
-                                        </p>
+                                    <div className="flex sm:justify-between md:flex-col md:gap-4 ">
+                                        <div
+                                            className="flex flex-col w-full gap-2"
+                                            onClick={() =>
+                                                copyToClipboard(
+                                                    wallet.publicKey
+                                                )
+                                            }>
+                                            <span className="text-lg md:text-xl font-bold tracking-tighter">
+                                                Public Key
+                                            </span>
+                                            <p className="text-primary/80 font-medium cursor-pointer hover:text-primary transition-all duration-300 truncate">
+                                                {wallet.publicKey}
+                                            </p>
+                                        </div>
+                                        <div className="flex flex-col w-full gap-3">
+                                            <span className="text-lg md:text-xl font-bold tracking-tighter">
+                                                Balance
+                                            </span>
+                                            <div className="flex justify-between w-full items-center gap-2">
+                                                <p className="text-primary/80 font-medium cursor-pointer hover:text-primary transition-all duration-300 truncate">
+                                                    {balance} SOL
+                                                </p>
+                                                <Button
+                                                    onClick={() =>
+                                                        getBalanceDetails(
+                                                            wallet.publicKey
+                                                        )
+                                                    }>
+                                                    Refresh
+                                                </Button>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div className="flex flex-col w-full gap-2">
                                         <span className="text-lg md:text-xl font-bold tracking-tighter">
