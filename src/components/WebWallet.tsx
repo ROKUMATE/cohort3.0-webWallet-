@@ -238,10 +238,10 @@ const WalletGenerator = () => {
                 jsonrpc: '2.0',
                 id: 1,
                 method: 'getBalance',
-                params: [publicKey],
+                params: [`${publicKey}`],
             };
 
-            console.log('Public Key is : ', data.params[0]);
+            console.log('Public Key is : ', data.params);
 
             try {
                 const response = await axios.post(url, data, {
@@ -249,8 +249,9 @@ const WalletGenerator = () => {
                         'Content-Type': 'application/json',
                     },
                 });
-                setBalance(response.data.result.value.toString());
-                console.log(response.data);
+                console.log(response);
+                setBalance(response.data.result.value);
+                // console.log(response.data);
             } catch (error) {
                 console.error('Error fetching Solana balance:', error);
             }
